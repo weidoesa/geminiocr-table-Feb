@@ -90,7 +90,7 @@ function App() {
     };
   }, [images.length]);
 
-  // 将文件转换为Base64
+  // 将文件转换为Base641111
   const fileToGenerativePart = async (file) => {
     const reader = new FileReader();
     return new Promise((resolve) => {
