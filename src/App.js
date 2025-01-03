@@ -538,7 +538,7 @@ function App() {
     <div className="app">
       <header>
         <a 
-          href="https://github.com/cokice/googleocr-app" 
+          href="https://github.com/CiZaii" 
           target="_blank" 
           rel="noopener noreferrer" 
           className="github-link"
