@@ -3,11 +3,6 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import 'katex/dist/katex.min.css';
 import { InlineMath, BlockMath } from 'react-katex';
 import './App.css';
-import { Document, Page, pdfjs } from 'react-pdf';
-import mammoth from 'mammoth';
-
-// 设置 PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 // 初始化 Gemini API
 const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY);
@@ -18,16 +13,6 @@ const generationConfig = {
   topP: 1,
   topK: 1,
   maxOutputTokens: 8192,
-};
-
-// 添加支持的文件类型配置
-const SUPPORTED_FILE_TYPES = {
-  IMAGE: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-  PDF: ['application/pdf'],
-  WORD: [
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  ]
 };
 
 // 简化 LaTeX 处理函数
@@ -57,8 +42,6 @@ function App() {
   const [showAnimation, setShowAnimation] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
-  const [numPages, setNumPages] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
 
   // 修改粘贴事件处理函数
   useEffect(() => {
@@ -125,49 +108,6 @@ function App() {
 
   // 修改文件处理逻辑
   const handleFile = async (file, index) => {
-    try {
-      setIsStreaming(true);
-      setStreamingText('');
-      setResults(prev => {
-        const newResults = [...prev];
-        newResults[index] = '';
-        return newResults;
-      });
-
-      let content = '';
-      
-      // 根据文件类型选择处理方法
-      if (SUPPORTED_FILE_TYPES.IMAGE.includes(file.type)) {
-        content = await handleImageFile(file);
-      } else if (SUPPORTED_FILE_TYPES.PDF.includes(file.type)) {
-        content = await handlePdfFile(file);
-      } else if (SUPPORTED_FILE_TYPES.WORD.includes(file.type)) {
-        content = await handleWordFile(file);
-      } else {
-        throw new Error('不支持的文件类型');
-      }
-
-      setResults(prev => {
-        const newResults = [...prev];
-        newResults[index] = content;
-        return newResults;
-      });
-      setStreamingText(content);
-
-    } catch (error) {
-      console.error('处理文件时出错:', error);
-      setResults(prev => {
-        const newResults = [...prev];
-        newResults[index] = `处理出错: ${error.message}`;
-        return newResults;
-      });
-    } finally {
-      setIsStreaming(false);
-    }
-  };
-
-  // 处理图片文件
-  const handleImageFile = async (file) => {
     if (file && file.type.startsWith('image/')) {
       try {
         setIsStreaming(true);
@@ -281,34 +221,6 @@ function App() {
     }
   };
 
-  // 处理 PDF 文件
-  const handlePdfFile = async (file) => {
-    const fileReader = new FileReader();
-    const pdfData = await new Promise((resolve) => {
-      fileReader.onload = () => resolve(fileReader.result);
-      fileReader.readAsArrayBuffer(file);
-    });
-
-    const pdf = await pdfjs.getDocument({ data: pdfData }).promise;
-    let fullText = '';
-
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map(item => item.str).join(' ');
-      fullText += pageText + '\n\n';
-    }
-
-    return fullText;
-  };
-
-  // 处理 Word 文件
-  const handleWordFile = async (file) => {
-    const arrayBuffer = await file.arrayBuffer();
-    const result = await mammoth.extractRawText({ arrayBuffer });
-    return result.value;
-  };
-
   // 添加并发控制函数
   const concurrentProcess = async (items, processor, maxConcurrent = 5) => {
     const results = [];
@@ -327,38 +239,25 @@ function App() {
     setIsLoading(true);
     
     try {
-      const startIndex = images.length;
+      const startIndex = images.length;  // 获取当前图片数量作为起始索引
       
-      // 处理所有支持的文件类型
-      const validFiles = files.filter(file => 
-        [...SUPPORTED_FILE_TYPES.IMAGE, 
-         ...SUPPORTED_FILE_TYPES.PDF, 
-         ...SUPPORTED_FILE_TYPES.WORD
-        ].includes(file.type)
-      );
-
-      // 生成预览
-      const previews = await Promise.all(validFiles.map(async file => {
-        if (SUPPORTED_FILE_TYPES.IMAGE.includes(file.type)) {
-          return URL.createObjectURL(file);
-        } else if (SUPPORTED_FILE_TYPES.PDF.includes(file.type)) {
-          // 返回 PDF 首页预览
-          return '/pdf-icon.png'; // 使用一个 PDF 图标
-        } else if (SUPPORTED_FILE_TYPES.WORD.includes(file.type)) {
-          return '/word-icon.png'; // 使用一个 Word 图标
-        }
-      }));
-
-      setImages(prev => [...prev, ...previews]);
-      setResults(prev => [...prev, ...new Array(validFiles.length).fill('')]);
+      // 先一次性更新所有图片预览
+      const imageUrls = files.map(file => URL.createObjectURL(file));
+      setImages(prev => [...prev, ...imageUrls]);
+      
+      // 初始化结果数组
+      setResults(prev => [...prev, ...new Array(files.length).fill('')]);
+      
+      // 立即切换到第一张新图片
       setCurrentIndex(startIndex);
-
+      
+      // 使用并发控制处理文件
       await concurrentProcess(
-        validFiles,
+        files,
         (file, index) => handleFile(file, startIndex + index)
       );
     } catch (error) {
-      console.error('处理文件时出错:', error);
+      console.error('Error processing files:', error);
     } finally {
       setIsLoading(false);
     }
@@ -664,11 +563,8 @@ function App() {
           >
             <div className="upload-container">
               <label className="upload-button" htmlFor="file-input">
-                {images.length > 0 ? '重新上传' : '上传文件'}
+                {images.length > 0 ? '重新上传' : '上传图片'}
               </label>
-              <p className="supported-types">
-                支持的格式：PNG、JPG、PDF、Word
-              </p>
               <input
                 id="file-input"
                 type="file"
