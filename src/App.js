@@ -174,6 +174,7 @@ function App() {
         setStreamingText('');
         setResults(prev => {
           const newResults = [...prev];
+          let index;
           newResults[index] = '';
           return newResults;
         });
@@ -672,7 +673,7 @@ function App() {
               <input
                 id="file-input"
                 type="file"
-                accept="image/*"
+                accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 onChange={handleImageUpload}
                 multiple
                 hidden
