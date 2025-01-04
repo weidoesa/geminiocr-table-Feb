@@ -136,9 +136,8 @@ function App() {
 
       let content = '';
       
-      // 根据文件类型选择处理方法
       if (SUPPORTED_FILE_TYPES.IMAGE.includes(file.type)) {
-        content = await handleImageFile(file);
+        content = await handleImageFile(file, index);
       } else if (SUPPORTED_FILE_TYPES.PDF.includes(file.type)) {
         content = await handlePdfFile(file);
       } else if (SUPPORTED_FILE_TYPES.WORD.includes(file.type)) {
@@ -167,7 +166,7 @@ function App() {
   };
 
   // 处理图片文件
-  const handleImageFile = async (file) => {
+  const handleImageFile = async (file, index) => {
     if (file && file.type.startsWith('image/')) {
       try {
         setIsStreaming(true);
@@ -292,12 +291,39 @@ function App() {
 
     const pdf = await pdfjs.getDocument({ data: pdfData }).promise;
     let fullText = '';
+    const scale = 2; // 控制图片质量，可以根据需要调整
 
+    // 处理每一页
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map(item => item.str).join(' ');
-      fullText += pageText + '\n\n';
+      const viewport = page.getViewport({ scale });
+
+      // 创建 canvas
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      // 将 PDF 页面渲染到 canvas
+      await page.render({
+        canvasContext: context,
+        viewport: viewport
+      }).promise;
+
+      // 将 canvas 转换为图片
+      const imageData = canvas.toDataURL('image/jpeg', 1.0);
+      
+      // 创建图片文件
+      const imageFile = await fetch(imageData)
+        .then(res => res.blob())
+        .then(blob => new File([blob], `page-${i}.jpg`, { type: 'image/jpeg' }));
+
+      // 使用现有的图片处理逻辑处理每一页
+      const pageText = await handleImageFile(imageFile, -1); // 使用临时索引
+      fullText += `第 ${i} 页：\n${pageText}\n\n`;
+
+      // 清理 canvas
+      context.clearRect(0, 0, canvas.width, canvas.height);
     }
 
     return fullText;
@@ -338,26 +364,62 @@ function App() {
         ].includes(file.type)
       );
 
-      // 生成预览
-      const previews = await Promise.all(validFiles.map(async file => {
-        if (SUPPORTED_FILE_TYPES.IMAGE.includes(file.type)) {
-          return URL.createObjectURL(file);
-        } else if (SUPPORTED_FILE_TYPES.PDF.includes(file.type)) {
-          // 返回 PDF 首页预览
-          return '/pdf-icon.png'; // 使用一个 PDF 图标
-        } else if (SUPPORTED_FILE_TYPES.WORD.includes(file.type)) {
-          return '/word-icon.png'; // 使用一个 Word 图标
-        }
-      }));
+      // 生成预览和处理文件
+      for (let i = 0; i < validFiles.length; i++) {
+        const file = validFiles[i];
+        
+        if (SUPPORTED_FILE_TYPES.PDF.includes(file.type)) {
+          // 处理 PDF 文件
+          const pdfReader = new FileReader();
+          const pdfData = await new Promise((resolve) => {
+            pdfReader.onload = () => resolve(pdfReader.result);
+            pdfReader.readAsArrayBuffer(file);
+          });
 
-      setImages(prev => [...prev, ...previews]);
-      setResults(prev => [...prev, ...new Array(validFiles.length).fill('')]);
+          const pdf = await pdfjs.getDocument({ data: pdfData }).promise;
+          const numPages = pdf.numPages;
+
+          // 为每一页创建预览
+          for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+            const page = await pdf.getPage(pageNum);
+            const viewport = page.getViewport({ scale: 2 });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            await page.render({
+              canvasContext: context,
+              viewport: viewport
+            }).promise;
+
+            const imageUrl = canvas.toDataURL('image/jpeg');
+            setImages(prev => [...prev, imageUrl]);
+            setResults(prev => [...prev, '']);
+          }
+
+          // 处理 PDF 内容
+          const content = await handlePdfFile(file);
+          setResults(prev => {
+            const newResults = [...prev];
+            newResults[startIndex + i] = content;
+            return newResults;
+          });
+
+        } else {
+          // 处理其他类型文件
+          const preview = SUPPORTED_FILE_TYPES.IMAGE.includes(file.type)
+            ? URL.createObjectURL(file)
+            : '/word-icon.png';
+
+          setImages(prev => [...prev, preview]);
+          setResults(prev => [...prev, '']);
+          await handleFile(file, startIndex + i);
+        }
+      }
+
       setCurrentIndex(startIndex);
 
-      await concurrentProcess(
-        validFiles,
-        (file, index) => handleFile(file, startIndex + index)
-      );
     } catch (error) {
       console.error('处理文件时出错:', error);
     } finally {
@@ -673,7 +735,7 @@ function App() {
               <input
                 id="file-input"
                 type="file"
-                accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                accept="image/*"
                 onChange={handleImageUpload}
                 multiple
                 hidden
