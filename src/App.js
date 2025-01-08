@@ -132,30 +132,32 @@ function App() {
       let content = '';
       
       // 根据文件类型选择处理方法
-      if (SUPPORTED_FILE_TYPES.IMAGE.includes(file.type)) {
+      if (file.type === 'application/pdf') {
+        content = await handlePdfFile(file, index);
+      } else if (file.type.startsWith('image/')) {
         content = await handleImageFile(file, index);
-      } else if (file.type === 'application/pdf') {
-        content = await handlePdfFile(file);
-      } else if (SUPPORTED_FILE_TYPES.WORD.includes(file.type)) {
-        content = await handleWordFile(file);
       } else {
         throw new Error('不支持的文件类型');
       }
 
-      setResults(prev => {
-        const newResults = [...prev];
-        newResults[index] = content;
-        return newResults;
-      });
-      setStreamingText(content);
+      if (index >= 0 && !file.type.startsWith('application/pdf')) {
+        setResults(prev => {
+          const newResults = [...prev];
+          newResults[index] = content;
+          return newResults;
+        });
+        setStreamingText(content);
+      }
 
     } catch (error) {
       console.error('处理文件时出错:', error);
-      setResults(prev => {
-        const newResults = [...prev];
-        newResults[index] = `处理出错: ${error.message}`;
-        return newResults;
-      });
+      if (index >= 0) {
+        setResults(prev => {
+          const newResults = [...prev];
+          newResults[index] = `处理出错: ${error.message}`;
+          return newResults;
+        });
+      }
     } finally {
       setIsStreaming(false);
     }
@@ -278,24 +280,81 @@ function App() {
   };
 
   // 处理 PDF 文件
-  const handlePdfFile = async (file) => {
-    const fileReader = new FileReader();
-    const pdfData = await new Promise((resolve) => {
-      fileReader.onload = () => resolve(fileReader.result);
-      fileReader.readAsArrayBuffer(file);
-    });
+  const handlePdfFile = async (file, startIndex) => {
+    try {
+      const fileReader = new FileReader();
+      const pdfData = await new Promise((resolve) => {
+        fileReader.onload = () => resolve(fileReader.result);
+        fileReader.readAsArrayBuffer(file);
+      });
 
-    const pdf = await pdfjs.getDocument({ data: pdfData }).promise;
-    let fullText = '';
+      const pdf = await pdfjs.getDocument({ data: pdfData }).promise;
+      const totalPages = pdf.numPages;
+      const pdfImages = [];
 
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map(item => item.str).join(' ');
-      fullText += pageText + '\n\n';
+      // 第一步：先将所有PDF页面转换为图片
+      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        console.log('正在转换第', pageNum, '页为图片');
+        const page = await pdf.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 2.0 });
+        
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        await page.render({
+          canvasContext: context,
+          viewport: viewport
+        }).promise;
+
+        const imageData = canvas.toDataURL('image/jpeg', 1.0);
+        pdfImages.push(imageData);
+      }
+
+      // 更新图片预览
+      setImages(prev => {
+        const newImages = [...prev];
+        // 删除PDF预览图标，插入所有页面图片
+        newImages.splice(startIndex, 1, ...pdfImages);
+        return newImages;
+      });
+
+      // 初始化结果数组
+      setResults(prev => {
+        const newResults = [...prev];
+        newResults.splice(startIndex, 1, ...new Array(pdfImages.length).fill('正在识别中...'));
+        return newResults;
+      });
+
+      // 第二步：逐个对图片进行OCR识别
+      for (let pageNum = 0; pageNum < pdfImages.length; pageNum++) {
+        console.log('正在识别第', pageNum + 1, '页');
+        const imageFile = await fetch(pdfImages[pageNum])
+          .then(res => res.blob())
+          .then(blob => new File([blob], `page_${pageNum + 1}.jpg`, { type: 'image/jpeg' }));
+
+        // 对当前页面进行OCR识别
+        const pageResult = await handleImageFile(imageFile, startIndex + pageNum);
+        
+        // 更新当前页面的识别结果
+        setResults(prev => {
+          const newResults = [...prev];
+          newResults[startIndex + pageNum] = pageResult;
+          return newResults;
+        });
+
+        // 如果当前正在查看这一页，更新显示的文本
+        if (currentIndex === startIndex + pageNum) {
+          setStreamingText(pageResult);
+        }
+      }
+
+      return '完成';
+    } catch (error) {
+      console.error('PDF处理错误:', error);
+      throw new Error(`PDF处理失败: ${error.message}`);
     }
-
-    return fullText;
   };
 
   // 处理 Word 文件
@@ -327,21 +386,16 @@ function App() {
       
       // 处理所有支持的文件类型
       const validFiles = files.filter(file => 
-        [...SUPPORTED_FILE_TYPES.IMAGE, 
-         ...SUPPORTED_FILE_TYPES.PDF, 
-         ...SUPPORTED_FILE_TYPES.WORD
-        ].includes(file.type)
+        file.type.startsWith('image/') || file.type === 'application/pdf'
       );
 
       // 生成预览
       const previews = await Promise.all(validFiles.map(async file => {
-        if (SUPPORTED_FILE_TYPES.IMAGE.includes(file.type)) {
+        if (file.type.startsWith('image/')) {
           return URL.createObjectURL(file);
-        } else if (SUPPORTED_FILE_TYPES.PDF.includes(file.type)) {
-          // 返回 PDF 首页预览
-          return '/pdf-icon.png'; // 使用一个 PDF 图标
-        } else if (SUPPORTED_FILE_TYPES.WORD.includes(file.type)) {
-          return '/word-icon.png'; // 使用一个 Word 图标
+        } else if (file.type === 'application/pdf') {
+          // 为PDF创建临时预览
+          return '/pdf-icon.png';
         }
       }));
 
@@ -349,10 +403,11 @@ function App() {
       setResults(prev => [...prev, ...new Array(validFiles.length).fill('')]);
       setCurrentIndex(startIndex);
 
-      await concurrentProcess(
-        validFiles,
-        (file, index) => handleFile(file, startIndex + index)
-      );
+      // 逐个处理文件
+      for (let i = 0; i < validFiles.length; i++) {
+        const file = validFiles[i];
+        await handleFile(file, startIndex + i);
+      }
     } catch (error) {
       console.error('处理文件时出错:', error);
     } finally {
@@ -668,7 +723,7 @@ function App() {
               <input
                 id="file-input"
                 type="file"
-                accept="image/*"
+                accept="image/*,application/pdf"
                 onChange={handleImageUpload}
                 multiple
                 hidden
