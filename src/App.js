@@ -167,16 +167,8 @@ function App() {
   const handleImageFile = async (file, index) => {
     if (file && file.type.startsWith('image/')) {
       try {
-        setIsStreaming(true);
-        setStreamingText('');
-        
-        // 使用传入的 index
-        setResults(prev => {
-          const newResults = [...prev];
-          newResults[index] = '';
-          return newResults;
-        });
-
+        // 不在这里设置全局的streaming状态
+        // 而是返回一个包含状态的对象
         let fullText = '';
         
         if (process.env.NODE_ENV === 'development') {
@@ -208,12 +200,18 @@ function App() {
           for await (const chunk of result.stream) {
             const chunkText = chunk.text();
             fullText += chunkText;
-            setStreamingText(fullText);
+            
+            // 更新对应页面的结果
             setResults(prevResults => {
               const newResults = [...prevResults];
               newResults[index] = fullText;
               return newResults;
             });
+            
+            // 仅当当前查看的是这一页时，才更新streaming文本
+            if (currentIndex === index) {
+              setStreamingText(fullText);
+            }
           }
         } else {
           const fileReader = new FileReader();
@@ -249,12 +247,18 @@ function App() {
                 try {
                   const data = JSON.parse(line.slice(6));
                   fullText += data.text;
-                  setStreamingText(fullText);
+                  
+                  // 更新对应页面的结果
                   setResults(prevResults => {
                     const newResults = [...prevResults];
                     newResults[index] = fullText;
                     return newResults;
                   });
+                  
+                  // 仅当当前查看的是这一页时，才更新streaming文本
+                  if (currentIndex === index) {
+                    setStreamingText(fullText);
+                  }
                 } catch (e) {
                   console.error('Error parsing chunk:', e);
                 }
@@ -263,23 +267,25 @@ function App() {
           }
         }
 
-        setIsStreaming(false);
         return fullText;
 
       } catch (error) {
         console.error('Error details:', error);
+        const errorMessage = `识别出错,请重试 (${error.message})`;
+        
+        // 更新错误信息到对应页面
         setResults(prevResults => {
           const newResults = [...prevResults];
-          newResults[index] = `识别出错,请重试 (${error.message})`;
+          newResults[index] = errorMessage;
           return newResults;
         });
-        setIsStreaming(false);
+        
         throw error;
       }
     }
   };
 
-  // 处理 PDF 文件
+  // 修改PDF文件处理函数
   const handlePdfFile = async (file, startIndex) => {
     try {
       const fileReader = new FileReader();
@@ -315,7 +321,6 @@ function App() {
       // 更新图片预览
       setImages(prev => {
         const newImages = [...prev];
-        // 删除PDF预览图标，插入所有页面图片
         newImages.splice(startIndex, 1, ...pdfImages);
         return newImages;
       });
@@ -327,27 +332,24 @@ function App() {
         return newResults;
       });
 
-      // 第二步：逐个对图片进行OCR识别
-      for (let pageNum = 0; pageNum < pdfImages.length; pageNum++) {
-        console.log('正在识别第', pageNum + 1, '页');
-        const imageFile = await fetch(pdfImages[pageNum])
-          .then(res => res.blob())
-          .then(blob => new File([blob], `page_${pageNum + 1}.jpg`, { type: 'image/jpeg' }));
+      // 使用 Promise.all 并行处理所有页面，但限制并发数
+      const batchSize = 3; // 每批处理的页面数
+      const results = [];
+      
+      for (let i = 0; i < pdfImages.length; i += batchSize) {
+        const batch = pdfImages.slice(i, i + batchSize);
+        const batchPromises = batch.map(async (imageData, batchIndex) => {
+          const pageIndex = i + batchIndex;
+          const imageFile = await fetch(imageData)
+            .then(res => res.blob())
+            .then(blob => new File([blob], `page_${pageIndex + 1}.jpg`, { type: 'image/jpeg' }));
 
-        // 对当前页面进行OCR识别
-        const pageResult = await handleImageFile(imageFile, startIndex + pageNum);
-        
-        // 更新当前页面的识别结果
-        setResults(prev => {
-          const newResults = [...prev];
-          newResults[startIndex + pageNum] = pageResult;
-          return newResults;
+          return handleImageFile(imageFile, startIndex + pageIndex);
         });
 
-        // 如果当前正在查看这一页，更新显示的文本
-        if (currentIndex === startIndex + pageNum) {
-          setStreamingText(pageResult);
-        }
+        // 等待当前批次完成
+        const batchResults = await Promise.all(batchPromises);
+        results.push(...batchResults);
       }
 
       return '完成';
