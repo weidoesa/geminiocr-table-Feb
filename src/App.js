@@ -43,6 +43,8 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isDraggingGlobal, setIsDraggingGlobal] = useState(false);
+  const [streamingStates, setStreamingStates] = useState({});
+  const [streamingTexts, setStreamingTexts] = useState({});
   const resultRef = useRef(null);
   const dropZoneRef = useRef(null);
   const [showUrlInput, setShowUrlInput] = useState(false);
@@ -167,9 +169,11 @@ function App() {
   const handleImageFile = async (file, index) => {
     if (file && file.type.startsWith('image/')) {
       try {
-        // 不在这里设置全局的streaming状态
-        // 而是返回一个包含状态的对象
         let fullText = '';
+        
+        // 初始化这一页的streaming状态
+        setStreamingStates(prev => ({ ...prev, [index]: true }));
+        setStreamingTexts(prev => ({ ...prev, [index]: '' }));
         
         if (process.env.NODE_ENV === 'development') {
           const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY);
@@ -201,17 +205,15 @@ function App() {
             const chunkText = chunk.text();
             fullText += chunkText;
             
-            // 更新对应页面的结果
+            // 更新这一页的streaming文本
+            setStreamingTexts(prev => ({ ...prev, [index]: fullText }));
+            
+            // 更新结果数组
             setResults(prevResults => {
               const newResults = [...prevResults];
               newResults[index] = fullText;
               return newResults;
             });
-            
-            // 仅当当前查看的是这一页时，才更新streaming文本
-            if (currentIndex === index) {
-              setStreamingText(fullText);
-            }
           }
         } else {
           const fileReader = new FileReader();
@@ -248,17 +250,15 @@ function App() {
                   const data = JSON.parse(line.slice(6));
                   fullText += data.text;
                   
-                  // 更新对应页面的结果
+                  // 更新这一页的streaming文本
+                  setStreamingTexts(prev => ({ ...prev, [index]: fullText }));
+                  
+                  // 更新结果数组
                   setResults(prevResults => {
                     const newResults = [...prevResults];
                     newResults[index] = fullText;
                     return newResults;
                   });
-                  
-                  // 仅当当前查看的是这一页时，才更新streaming文本
-                  if (currentIndex === index) {
-                    setStreamingText(fullText);
-                  }
                 } catch (e) {
                   console.error('Error parsing chunk:', e);
                 }
@@ -267,13 +267,17 @@ function App() {
           }
         }
 
+        // 完成后更新状态
+        setStreamingStates(prev => ({ ...prev, [index]: false }));
         return fullText;
 
       } catch (error) {
         console.error('Error details:', error);
         const errorMessage = `识别出错,请重试 (${error.message})`;
         
-        // 更新错误信息到对应页面
+        setStreamingStates(prev => ({ ...prev, [index]: false }));
+        setStreamingTexts(prev => ({ ...prev, [index]: errorMessage }));
+        
         setResults(prevResults => {
           const newResults = [...prevResults];
           newResults[index] = errorMessage;
@@ -421,14 +425,12 @@ function App() {
   const handlePrevImage = () => {
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
-      setStreamingText(results[currentIndex - 1] || '');
     }
   };
 
   const handleNextImage = () => {
     if (currentIndex < images.length - 1) {
       setCurrentIndex(prev => prev + 1);
-      setStreamingText(results[currentIndex + 1] || '');
     }
   };
 
@@ -720,7 +722,7 @@ function App() {
                 {images.length > 0 ? '重新上传' : '上传文件'}
               </label>
               <p className="supported-types">
-                支持的格式：PNG、JPG、PDF、Word
+                支持的格式：PNG、JPG、PDF
               </p>
               <input
                 id="file-input"
@@ -811,35 +813,37 @@ function App() {
                   </div>
                   <div className="gradient-text">
                     <div className="streaming-text">
-                      {streamingText.split('\n').map((line, index) => (
-                        <p 
-                          key={index} 
-                          className="animated-line"
-                          style={{ '--index': index }}
-                        >
-                          {line.includes('$') ? (
-                            line.split(/(\$\$.*?\$\$|\$.*?\$)/g).map((part, i) => {
-                              if (part.startsWith('$$') && part.endsWith('$$')) {
-                                return (
-                                  <div key={i} className="latex-block">
-                                    <BlockMath>{part.slice(2, -2)}</BlockMath>
-                                  </div>
-                                );
-                              } else if (part.startsWith('$') && part.endsWith('$')) {
-                                return (
-                                  <span key={i} className="latex-inline">
-                                    <InlineMath>{part.slice(1, -1)}</InlineMath>
-                                  </span>
-                                );
-                              } else {
-                                return part;
-                              }
-                            })
-                          ) : (
-                            line || ' '
-                          )}
-                        </p>
-                      ))}
+                      {(streamingStates[currentIndex] ? streamingTexts[currentIndex] : results[currentIndex])
+                        ?.split('\n')
+                        .map((line, index) => (
+                          <p 
+                            key={index} 
+                            className="animated-line"
+                            style={{ '--index': index }}
+                          >
+                            {line.includes('$') ? (
+                              line.split(/(\$\$.*?\$\$|\$.*?\$)/g).map((part, i) => {
+                                if (part.startsWith('$$') && part.endsWith('$$')) {
+                                  return (
+                                    <div key={i} className="latex-block">
+                                      <BlockMath>{part.slice(2, -2)}</BlockMath>
+                                    </div>
+                                  );
+                                } else if (part.startsWith('$') && part.endsWith('$')) {
+                                  return (
+                                    <span key={i} className="latex-inline">
+                                      <InlineMath>{part.slice(1, -1)}</InlineMath>
+                                    </span>
+                                  );
+                                } else {
+                                  return part;
+                                }
+                              })
+                            ) : (
+                              line || ' '
+                            )}
+                          </p>
+                        ))}
                     </div>
                   </div>
                 </div>
