@@ -61,6 +61,7 @@ function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [numPages, setNumPages] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [modelType, setModelType] = useState('openai');
 
   // 修改粘贴事件处理函数
   useEffect(() => {
@@ -176,44 +177,127 @@ function App() {
         setStreamingTexts(prev => ({ ...prev, [index]: '' }));
         
         if (process.env.NODE_ENV === 'development') {
-          const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY);
-          const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash-exp",
-            generationConfig,
+          const fileReader = new FileReader();
+          const imageData = await new Promise((resolve) => {
+            fileReader.onloadend = () => {
+              resolve(fileReader.result);
+            };
+            fileReader.readAsDataURL(file);
           });
 
-          const imagePart = await fileToGenerativePart(file);
-          const result = await model.generateContentStream([
-            "请识别图片中的文字内容，严格按照以下规则输出：" +
-            "1. 数学公式规范：" +
-            "   - 独立成行的公式使用 $$...$$" +
-            "   - 行内变量和表达式使用 $...$ 包裹" +
-            "   - 保持原文中的变量名称不变" +           
-            "2. 示例：" +
-            "   - 原文：'当 n 为偶数时'" +
-            "   - 正确输出：'当 $n$ 为偶数时'" +
-            "   - 错误输出：'当 Tn 为偶数时' 或 '当 @n@ 为偶数时'" +
-            "3. 文字识别要求：" +
-            "   - 如遇到模糊不清的单词或中文，根据上下文语境进行合理推测和修正" +
-            "   - 保持语句通顺和语义连贯性" +
-            "   - 专业术语和特定名词需要准确识别" +
-            "4. 直接输出内容，不要添加任何说明",
-            imagePart
-          ]);
-
-          for await (const chunk of result.stream) {
-            const chunkText = chunk.text();
-            fullText += chunkText;
-            
-            // 更新这一页的streaming文本
-            setStreamingTexts(prev => ({ ...prev, [index]: fullText }));
-            
-            // 更新结果数组
-            setResults(prevResults => {
-              const newResults = [...prevResults];
-              newResults[index] = fullText;
-              return newResults;
+          if (modelType === 'openai') {
+            // OpenAI API调用
+            const response = await fetch('https://zangaaa-g2api.hf.space/hf/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer 26e72514-58a7-47fd-b40d-12daef4aec32'
+              },
+              body: JSON.stringify({
+                model: "gpt-4o",
+                messages: [
+                  {
+                    role: "user",
+                    content: [
+                      {
+                        type: "text",
+                        text: "请你识别图片中的文字内容并输出，如果有格式不规整可以根据内容排版，或者单词错误中文词汇错误可以纠正，不要有任何开场白、解释、描述、总结或结束语。"
+                      },
+                      {
+                        type: "image_url",
+                        image_url: {
+                          url: imageData
+                        }
+                      }
+                    ]
+                  }
+                ],
+                max_tokens: 4096,
+                stream: true
+              })
             });
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              const chunk = decoder.decode(value);
+              const lines = chunk.split('\n');
+              
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+                    const content = data.choices?.[0]?.delta?.content || '';
+                    if (content) {
+                      fullText += content;
+                      
+                      // 更新这一页的streaming文本
+                      setStreamingTexts(prev => ({ ...prev, [index]: fullText }));
+                      
+                      // 更新结果数组
+                      setResults(prevResults => {
+                        const newResults = [...prevResults];
+                        newResults[index] = fullText;
+                        return newResults;
+                      });
+                    }
+                  } catch (e) {
+                    console.error('Error parsing chunk:', e);
+                  }
+                }
+              }
+            }
+          } else {
+            // Gemini API调用
+            const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY);
+            const model = genAI.getGenerativeModel({
+              model: "gemini-2.0-flash-exp",
+              generationConfig,
+            });
+
+            const imagePart = {
+              inlineData: {
+                data: imageData.split(',')[1],
+                mimeType: file.type
+              },
+            };
+
+            const result = await model.generateContentStream([
+              "请识别图片中的文字内容，严格按照以下规则输出：" +
+              "1. 数学公式规范：" +
+              "   - 独立成行的公式使用 $$...$$" +
+              "   - 行内变量和表达式使用 $...$ 包裹" +
+              "   - 保持原文中的变量名称不变" +           
+              "2. 示例：" +
+              "   - 原文：'当 n 为偶数时'" +
+              "   - 正确输出：'当 $n$ 为偶数时'" +
+              "   - 错误输出：'当 Tn 为偶数时' 或 '当 @n@ 为偶数时'" +
+              "3. 文字识别要求：" +
+              "   - 如遇到模糊不清的单词或中文，根据上下文语境进行合理推测和修正" +
+              "   - 保持语句通顺和语义连贯性" +
+              "   - 专业术语和特定名词需要准确识别" +
+              "4. 直接输出内容，不要添加任何说明",
+              imagePart
+            ]);
+
+            for await (const chunk of result.stream) {
+              const chunkText = chunk.text();
+              fullText += chunkText;
+              
+              // 更新这一页的streaming文本
+              setStreamingTexts(prev => ({ ...prev, [index]: fullText }));
+              
+              // 更新结果数组
+              setResults(prevResults => {
+                const newResults = [...prevResults];
+                newResults[index] = fullText;
+                return newResults;
+              });
+            }
           }
         } else {
           const fileReader = new FileReader();
@@ -224,7 +308,7 @@ function App() {
             fileReader.readAsDataURL(file);
           });
 
-          const response = await fetch('/api/recognize', {
+          const response = await fetch('/api/recognizeOpenAI', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -709,6 +793,21 @@ function App() {
 
       <main className={images.length > 0 ? 'has-content' : ''}>
         <div className={`upload-section ${images.length > 0 ? 'with-image' : ''}`}>
+          <div className="model-switch">
+            <button 
+              className={`model-button ${modelType === 'openai' ? 'active' : ''}`}
+              onClick={() => setModelType('openai')}
+            >
+              OpenAI
+            </button>
+            <button 
+              className={`model-button ${modelType === 'gemini' ? 'active' : ''}`}
+              onClick={() => setModelType('gemini')}
+            >
+              Gemini
+            </button>
+          </div>
+          
           <div 
             ref={dropZoneRef}
             className={`upload-zone ${isDragging ? 'dragging' : ''}`}

@@ -1505,3 +1505,32 @@ main.has-content {
   font-weight: 500;
 }
 
+.model-switch {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.model-button {
+  padding: 8px 20px;
+  border: 2px solid #4a90e2;
+  border-radius: 20px;
+  background: transparent;
+  color: #4a90e2;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.model-button:hover {
+  background: #4a90e280;
+  color: white;
+}
+
+.model-button.active {
+  background: #4a90e2;
+  color: white;
+}
+
