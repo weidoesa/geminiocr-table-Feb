@@ -30,10 +30,99 @@ const SUPPORTED_FILE_TYPES = {
   ]
 };
 
-// 简化 LaTeX 处理函数
+// 添加提示文本常量
+const LATEX_EXAMPLES = {
+  FRACTION: '\\frac{分子}{分母}',
+  SQRT: '\\sqrt{被开方数}',
+  SUPERSCRIPT: 'x^2',
+  SUBSCRIPT: 'x_n',
+  LIMIT: '\\lim\\limits_{x}',
+};
+
+const CHOICE_EXAMPLE = {
+  QUESTION: '上3个无穷小量按照从低阶到高阶的排序是( )',
+  OPTIONS: [
+    '\\alpha_1, \\alpha_2, \\alpha_3',
+    '\\alpha_2, \\alpha_1, \\alpha_3',
+    '\\alpha_1, \\alpha_3, \\alpha_2',
+    '\\alpha_2, \\alpha_3, \\alpha_1'
+  ]
+};
+
+const COMPLEX_EXAMPLE = {
+  PART1: '\\lim\\limits_{x \\to +\\infty} \\frac{\\arctan 2x - \\arctan x}{\\frac{\\pi}{2} - \\arctan x}',
+  PART2: '\\lim\\limits_{x \\to +\\infty} x[1-f(x)]',
+  PART3: '\\lim\\limits_{x \\to +\\infty} \\frac{\\arctan 2x + [b-1-bf(x)]\\arctan x}{\\frac{\\pi}{2} - \\arctan x}'
+};
+
+const OCR_PROMPT = `请你识别图片中的文字内容并输出，如果有格式不规整可以根据内容排版，或者单词错误中文词汇错误可以纠正，不要有任何开场白、解释、描述、总结或结束语。OCR识别图片上的内容，给出markdown的katex的格式的内容。
+
+选择题的序号使用A. B.依次类推。
+
+支持的主要语法：
+1. 基本语法：
+   - 使用 $ 或 $$ 包裹行内或块级数学公式
+   - 支持大量数学符号、希腊字母、运算符等
+   - 分数：${LATEX_EXAMPLES.FRACTION}
+   - 根号：${LATEX_EXAMPLES.SQRT}
+   - 上下标：${LATEX_EXAMPLES.SUPERSCRIPT}, ${LATEX_EXAMPLES.SUBSCRIPT}
+2. 极限使用：${LATEX_EXAMPLES.LIMIT}
+
+参考以下例子格式：
+
+### 35. ${CHOICE_EXAMPLE.QUESTION}
+A. $${CHOICE_EXAMPLE.OPTIONS[0]}$ 
+B. $${CHOICE_EXAMPLE.OPTIONS[1]}$ 
+C. $${CHOICE_EXAMPLE.OPTIONS[2]}$ 
+D. $${CHOICE_EXAMPLE.OPTIONS[3]}$
+
+36. (I) 求 $${COMPLEX_EXAMPLE.PART1}$;
+    (II) 若 $${COMPLEX_EXAMPLE.PART2}$ 不存在, 而 
+    $l = ${COMPLEX_EXAMPLE.PART3}$ 存在,
+试确定 $b$ 的值, 并求 (I)`;
+
+// 添加纠错提示模板
+const CORRECTION_PROMPT = `请检查并纠正以下数学公式和文本内容中的错误，特别注意：
+1. LaTeX 公式语法
+2. 数学符号的正确性
+3. 格式排版的规范性
+5. 不要添加任何解释，直接输出修正后的内容
+
+以下是需要检查的内容：
+---
+{content}
+---`;
+
+// 添加处理 LaTeX 文本的函数
 const processLatex = (text) => {
-  // 直接返回包含 $ 的文本，让 react-katex 处理
-  return text;
+  if (!text) return '';
+  
+  // 分离块级公式和行内公式
+  return text.split('\n').map(line => {
+    // 处理块级公式
+    if (line.includes('$$')) {
+      return line.replace(/\$\$(.*?)\$\$/g, (match, formula) => {
+        try {
+          return `<div class="math-block"><BlockMath>${formula.trim()}</BlockMath></div>`;
+        } catch (error) {
+          console.error('块级公式渲染错误:', error);
+          return `<pre><code>${formula}</code></pre>`;
+        }
+      });
+    }
+    // 处理行内公式
+    if (line.includes('$')) {
+      return line.replace(/\$(.*?)\$/g, (match, formula) => {
+        try {
+          return `<InlineMath>${formula.trim()}</InlineMath>`;
+        } catch (error) {
+          console.error('行内公式渲染错误:', error);
+          return `<code>${formula}</code>`;
+        }
+      });
+    }
+    return line;
+  }).join('\n');
 };
 
 function App() {
@@ -62,6 +151,7 @@ function App() {
   const [numPages, setNumPages] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [modelType, setModelType] = useState('openai');
+  const [isCorrectingText, setIsCorrectingText] = useState(false);
 
   // 修改粘贴事件处理函数
   useEffect(() => {
@@ -201,7 +291,7 @@ function App() {
                     content: [
                       {
                         type: "text",
-                        text: "请你识别图片中的文字内容并输出，如果有格式不规整可以根据内容排版，或者单词错误中文词汇错误可以纠正，不要有任何开场白、解释、描述、总结或结束语。"
+                        text: OCR_PROMPT
                       },
                       {
                         type: "image_url",
@@ -774,6 +864,92 @@ function App() {
     }
   };
 
+  // 添加纠错处理函数
+  const handleCorrectText = async () => {
+    if (!results[currentIndex] || isCorrectingText) return;
+    
+    setIsCorrectingText(true);
+    try {
+      const prompt = CORRECTION_PROMPT.replace('{content}', results[currentIndex]);
+      
+      if (modelType === 'openai') {
+        const response = await fetch('https://zangaaa-g2api.hf.space/hf/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer 26e72514-58a7-47fd-b40d-12daef4aec32'
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [
+              {
+                role: "user",
+                content: prompt
+              }
+            ],
+            max_tokens: 4096,
+            stream: true
+          })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let correctedText = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                const content = data.choices?.[0]?.delta?.content || '';
+                if (content) {
+                  correctedText += content;
+                  setResults(prev => {
+                    const newResults = [...prev];
+                    newResults[currentIndex] = correctedText;
+                    return newResults;
+                  });
+                }
+              } catch (e) {
+                console.error('Error parsing chunk:', e);
+              }
+            }
+          }
+        }
+      } else {
+        // Gemini API 调用
+        const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({
+          model: "gemini-2.0-flash-exp",
+          generationConfig,
+        });
+
+        const result = await model.generateContentStream([prompt]);
+        let correctedText = '';
+
+        for await (const chunk of result.stream) {
+          const chunkText = chunk.text();
+          correctedText += chunkText;
+          setResults(prev => {
+            const newResults = [...prev];
+            newResults[currentIndex] = correctedText;
+            return newResults;
+          });
+        }
+      }
+    } catch (error) {
+      console.error('纠错过程出错:', error);
+    } finally {
+      setIsCorrectingText(false);
+    }
+  };
+
   return (
     <div className="app">
       <header>
@@ -901,49 +1077,54 @@ function App() {
                 <div className="result-text">
                   <div className="result-header">
                     <span>第 {currentIndex + 1} 张图片的识别结果</span>
-                    {results[currentIndex] && (
+                    <div className="result-actions">
                       <button 
-                        className="copy-button"
-                        onClick={handleCopyText}
+                        className={`correct-button ${isCorrectingText ? 'correcting' : ''}`}
+                        onClick={handleCorrectText}
+                        disabled={isCorrectingText || !results[currentIndex]}
                       >
+                        {isCorrectingText ? '纠错中...' : '公式纠错'}
+                      </button>
+                      <button className="copy-button" onClick={handleCopyText}>
                         复制内容
                       </button>
-                    )}
+                    </div>
                   </div>
                   <div className="gradient-text">
-                    <div className="streaming-text">
-                      {(streamingStates[currentIndex] ? streamingTexts[currentIndex] : results[currentIndex])
-                        ?.split('\n')
-                        .map((line, index) => (
-                          <p 
-                            key={index} 
-                            className="animated-line"
-                            style={{ '--index': index }}
-                          >
-                            {line.includes('$') ? (
-                              line.split(/(\$\$.*?\$\$|\$.*?\$)/g).map((part, i) => {
-                                if (part.startsWith('$$') && part.endsWith('$$')) {
-                                  return (
-                                    <div key={i} className="latex-block">
-                                      <BlockMath>{part.slice(2, -2)}</BlockMath>
-                                    </div>
-                                  );
-                                } else if (part.startsWith('$') && part.endsWith('$')) {
-                                  return (
-                                    <span key={i} className="latex-inline">
-                                      <InlineMath>{part.slice(1, -1)}</InlineMath>
-                                    </span>
-                                  );
-                                } else {
-                                  return part;
+                    {(streamingStates[currentIndex] ? streamingTexts[currentIndex] : results[currentIndex])
+                      ?.split('\n')
+                      .map((line, index) => {
+                        if (line.trim().startsWith('$$') && line.trim().endsWith('$$')) {
+                          // 处理块级公式
+                          const formula = line.trim().slice(2, -2);
+                          return (
+                            <div key={index} className="math-block">
+                              <BlockMath>{formula}</BlockMath>
+                            </div>
+                          );
+                        } else if (line.includes('$')) {
+                          // 处理包含行内公式的行
+                          const parts = line.split(/(\$.*?\$)/g);
+                          return (
+                            <p key={index} className="animated-line" style={{ '--index': index }}>
+                              {parts.map((part, i) => {
+                                if (part.startsWith('$') && part.endsWith('$')) {
+                                  const formula = part.slice(1, -1);
+                                  return <InlineMath key={i}>{formula}</InlineMath>;
                                 }
-                              })
-                            ) : (
-                              line || ' '
-                            )}
-                          </p>
-                        ))}
-                    </div>
+                                return part;
+                              })}
+                            </p>
+                          );
+                        } else {
+                          // 处理普通文本
+                          return (
+                            <p key={index} className="animated-line" style={{ '--index': index }}>
+                              {line || ' '}
+                            </p>
+                          );
+                        }
+                      })}
                   </div>
                 </div>
               )}
