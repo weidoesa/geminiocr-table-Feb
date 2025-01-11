@@ -1534,3 +1534,113 @@ main.has-content {
   color: white;
 }
 
+/* Markdown 渲染样式 */
+.gradient-text {
+  font-size: 16px;
+  line-height: 1.8;
+  color: #1d1d1f;
+}
+
+.gradient-text p {
+  margin: 1em 0;
+  opacity: 0;
+  animation: fadeIn 0.5s ease-out forwards;
+  animation-delay: calc(var(--index, 0) * 100ms);
+}
+
+.gradient-text h1,
+.gradient-text h2,
+.gradient-text h3,
+.gradient-text h4,
+.gradient-text h5,
+.gradient-text h6 {
+  margin: 1.5em 0 0.5em;
+  color: #1d1d1f;
+  font-weight: 600;
+  line-height: 1.3;
+  opacity: 0;
+  animation: fadeIn 0.5s ease-out forwards;
+  animation-delay: calc(var(--index, 0) * 100ms);
+}
+
+.gradient-text h1 { font-size: 2em; }
+.gradient-text h2 { font-size: 1.75em; }
+.gradient-text h3 { font-size: 1.5em; }
+.gradient-text h4 { font-size: 1.25em; }
+.gradient-text h5 { font-size: 1.1em; }
+.gradient-text h6 { font-size: 1em; }
+
+/* 数学公式样式 */
+.math-block {
+  margin: 1.5em 0;
+  padding: 1em;
+  background: #f8f9fa;
+  border-radius: 8px;
+  overflow-x: auto;
+  opacity: 0;
+  animation: fadeIn 0.5s ease-out forwards;
+  animation-delay: calc(var(--index, 0) * 50ms);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 3em;
+}
+
+.math-block .katex-display {
+  margin: 0 !important;
+  text-align: center;
+}
+
+.math-block .katex {
+  font-size: 1.2em;
+  text-rendering: optimizeLegibility;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* 行内公式样式优化 */
+.katex-inline {
+  padding: 0 0.2em;
+  margin: 0 0.1em;
+  font-size: 1.1em;
+  vertical-align: middle;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* 文本行样式优化 */
+.text-line {
+  margin: 0.8em 0;
+  line-height: 1.8;
+  opacity: 0;
+  animation: fadeIn 0.5s ease-out forwards;
+  animation-delay: calc(var(--index, 0) * 50ms);
+}
+
+.text-line p {
+  margin: 0;
+}
+
+/* 确保公式容器内的滚动正常工作 */
+.katex-html {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5em 0;
+}
+
+/* 优化公式错误显示 */
+.katex-error {
+  color: #cc0000;
+  background: #fff0f0;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.9em;
+  white-space: pre-wrap;
+  word-break: break-all;
+  border: 1px solid #ffcdd2;
+  margin: 0.2em 0;
+  display: inline-block;
+}
+

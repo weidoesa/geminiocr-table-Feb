@@ -5,6 +5,10 @@ import { InlineMath, BlockMath } from 'react-katex';
 import './App.css';
 import { Document, Page, pdfjs } from 'react-pdf';
 import mammoth from 'mammoth';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 
 // 设置 PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -32,27 +36,27 @@ const SUPPORTED_FILE_TYPES = {
 
 // 添加提示文本常量
 const LATEX_EXAMPLES = {
-  FRACTION: '\\frac{分子}{分母}',
-  SQRT: '\\sqrt{被开方数}',
+  FRACTION: '\\\\frac{分子}{分母}',
+  SQRT: '\\\\sqrt{被开方数}',
   SUPERSCRIPT: 'x^2',
   SUBSCRIPT: 'x_n',
-  LIMIT: '\\lim\\limits_{x}',
+  LIMIT: '\\\\lim\\\\limits_{x}',
 };
 
 const CHOICE_EXAMPLE = {
   QUESTION: '上3个无穷小量按照从低阶到高阶的排序是( )',
   OPTIONS: [
-    '\\alpha_1, \\alpha_2, \\alpha_3',
-    '\\alpha_2, \\alpha_1, \\alpha_3',
-    '\\alpha_1, \\alpha_3, \\alpha_2',
-    '\\alpha_2, \\alpha_3, \\alpha_1'
+    '\\\\alpha_1, \\\\alpha_2, \\\\alpha_3',
+    '\\\\alpha_2, \\\\alpha_1, \\\\alpha_3',
+    '\\\\alpha_1, \\\\alpha_3, \\\\alpha_2',
+    '\\\\alpha_2, \\\\alpha_3, \\\\alpha_1'
   ]
 };
 
 const COMPLEX_EXAMPLE = {
-  PART1: '\\lim\\limits_{x \\to +\\infty} \\frac{\\arctan 2x - \\arctan x}{\\frac{\\pi}{2} - \\arctan x}',
-  PART2: '\\lim\\limits_{x \\to +\\infty} x[1-f(x)]',
-  PART3: '\\lim\\limits_{x \\to +\\infty} \\frac{\\arctan 2x + [b-1-bf(x)]\\arctan x}{\\frac{\\pi}{2} - \\arctan x}'
+  PART1: '\\\\lim\\\\imits_{x \\\\to +\\\\infty} \\\\frac{\\\\arctan 2x - \\\\arctan x}{\\\\frac{\\\\pi}{2} - \\\\arctan x}',
+  PART2: '\\\\lim\\\\imits_{x \\\\to +\\\\infty} x[1-f(x)]',
+  PART3: '\\\\lim\\\\imits_{x \\\\to +\\\\infty} \\\\frac{\\\\arctan 2x + [b-1-bf(x)]\\\\arctan x}{\\\\frac{\\\\pi}{2} - \\\\arctan x}'
 };
 
 const OCR_PROMPT = `请你识别图片中的文字内容并输出，如果有格式不规整可以根据内容排版，或者单词错误中文词汇错误可以纠正，不要有任何开场白、解释、描述、总结或结束语。OCR识别图片上的内容，给出markdown的katex的格式的内容。
@@ -87,11 +91,11 @@ const CORRECTION_PROMPT = `请检查并纠正以下数学公式和文本内容�
 2. 数学符号的正确性
 3. 格式排版的规范性
 5. 不要添加任何解释，直接输出修正后的内容
+6. 修正之后的数据一定是要可以正确解析的
 
 以下是需要检查的内容：
----
 {content}
----`;
+`;
 
 // 添加处理 LaTeX 文本的函数
 const processLatex = (text) => {
@@ -123,6 +127,21 @@ const processLatex = (text) => {
     }
     return line;
   }).join('\n');
+};
+
+// 添加处理公式的函数
+const processFormula = (formula) => {
+  try {
+    return formula
+      .replace(/\\tag{\d+}/g, '') // 移除 tag
+      .replace(/\\left\\/g, '\\left') // 修复 left
+      .replace(/\\right\\/g, '\\right') // 修复 right
+      .replace(/\\\s+/g, '\\') // 移除反斜杠后的空格
+      .trim();
+  } catch (error) {
+    console.error('处理公式错误:', error);
+    return formula;
+  }
 };
 
 function App() {
@@ -1091,40 +1110,18 @@ function App() {
                     </div>
                   </div>
                   <div className="gradient-text">
-                    {(streamingStates[currentIndex] ? streamingTexts[currentIndex] : results[currentIndex])
-                      ?.split('\n')
-                      .map((line, index) => {
-                        if (line.trim().startsWith('$$') && line.trim().endsWith('$$')) {
-                          // 处理块级公式
-                          const formula = line.trim().slice(2, -2);
-                          return (
-                            <div key={index} className="math-block">
-                              <BlockMath>{formula}</BlockMath>
-                            </div>
-                          );
-                        } else if (line.includes('$')) {
-                          // 处理包含行内公式的行
-                          const parts = line.split(/(\$.*?\$)/g);
-                          return (
-                            <p key={index} className="animated-line" style={{ '--index': index }}>
-                              {parts.map((part, i) => {
-                                if (part.startsWith('$') && part.endsWith('$')) {
-                                  const formula = part.slice(1, -1);
-                                  return <InlineMath key={i}>{formula}</InlineMath>;
-                                }
-                                return part;
-                              })}
-                            </p>
-                          );
-                        } else {
-                          // 处理普通文本
-                          return (
-                            <p key={index} className="animated-line" style={{ '--index': index }}>
-                              {line || ' '}
-                            </p>
-                          );
-                        }
-                      })}
+                    {(streamingStates[currentIndex] ? streamingTexts[currentIndex] : results[currentIndex])?.split(/(\$\$.*?\$\$|\$.*?\$)/gs).map((part, index) => {
+                      if (part.startsWith('$$') && part.endsWith('$$')) {
+                        // 块级公式
+                        return <BlockMath key={index} math={part.slice(2, -2)} />;
+                      } else if (part.startsWith('$') && part.endsWith('$')) {
+                        // 行内公式
+                        return <InlineMath key={index} math={part.slice(1, -1)} />;
+                      } else {
+                        // 普通文本
+                        return <span key={index}>{part}</span>;
+                      }
+                    })}
                   </div>
                 </div>
               )}
