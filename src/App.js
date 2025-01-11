@@ -61,6 +61,7 @@ const COMPLEX_EXAMPLE = {
 
 const OCR_PROMPT = `请你识别图片中的文字内容并输出，如果有格式不规整可以根据内容排版，或者单词错误中文词汇错误可以纠正，不要有任何开场白、解释、描述、总结或结束语。OCR识别图片上的内容，给出markdown的katex的格式的内容。
 限制：返回之后的数据一定是要可以正确解析的
+不要有<document>标签
 选择题的序号使用A. B.依次类推。
 
 支持的主要语法：
@@ -1114,7 +1115,7 @@ function App() {
                         return <InlineMath key={index} math={part.slice(1, -1)} />;
                       } else {
                         // 普通文本
-                        return <span key={index}>{part}</span>;
+                        return <ReactMarkdown key={index}>{part}</ReactMarkdown>;
                       }
                     })}
                   </div>
