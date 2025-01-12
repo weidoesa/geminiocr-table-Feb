@@ -72,6 +72,17 @@ const OCR_PROMPT = `请你识别图片中的文字内容并输出，如果有格
    - 根号：${LATEX_EXAMPLES.SQRT}
    - 上下标：${LATEX_EXAMPLES.SUPERSCRIPT}, ${LATEX_EXAMPLES.SUBSCRIPT}
 2. 极限使用：${LATEX_EXAMPLES.LIMIT}
+特别注意：
+1. 如果识别到类似表格的内容，请使用标准Markdown表格语法输出，例如：
+   | DESCRIPTION | RATE | HOURS | AMOUNT |
+   |------------|------|-------|---------|
+   | Copy Writing | $50/hr | 4 | $200.00 |
+   | Website Design | $50/hr | 2 | $100.00 |
+
+2. 表格的表头和单元格之间需要有分隔行（使用|-）
+3. 确保表格列对齐，每列至少要有3个-
+4. 金额要包含货币符号和小数点
+
 
 参考以下例子格式：
 
