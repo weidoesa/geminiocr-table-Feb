@@ -85,35 +85,30 @@ const COMPLEX_EXAMPLE = {
   PART3: '\\\\lim\\\\imits_{x \\\\to +\\\\infty} \\\\frac{\\\\arctan 2x + [b-1-bf(x)]\\\\arctan x}{\\\\frac{\\\\pi}{2} - \\\\arctan x}'
 };
 
-const OCR_PROMPT = `请你识别图片中的文字内容并输出，如果有格式不规整可以根据内容排版，或者单词错误中文词汇错误可以纠正。
-注意：
-1. 不要有任何开场白、解释、描述、总结或结束语
-2. 不要使用 \`\`\` 符号包裹内容
-3. 不要使用代码块标记
-4. 不要有<document>标签
-5. 直接输出识别的内容，不要加任何额外的标记
-6. 选择题的序号使用A. B.依次类推
-7. 数学公式使用 $ 或 $$ 标记
+const OCR_PROMPT = `请你识别图片中的文字内容并输出，如果有格式不规整可以根据内容排版，或者单词错误中文词汇错误可以纠正，不要有任何开场白、解释、描述、总结或结束语。OCR识别图片上的内容，给出katex格式的内容。
+限制：返回之后的数据一定是要可以正确解析的，不要带有反引号;
+不要有<document>标签
+选择题的序号使用A. B.依次类推。
 
 支持的主要语法：
 1. 基本语法：
-   - 使用 $ 包裹行内数学公式
-   - 使用 $$ 包裹块级数学公式
+   - 使用  $$ 包裹行内或块级数学公式
    - 支持大量数学符号、希腊字母、运算符等
    - 分数：${LATEX_EXAMPLES.FRACTION}
    - 根号：${LATEX_EXAMPLES.SQRT}
    - 上下标：${LATEX_EXAMPLES.SUPERSCRIPT}, ${LATEX_EXAMPLES.SUBSCRIPT}
 2. 极限使用：${LATEX_EXAMPLES.LIMIT}
-
 特别注意：
 1. 如果识别到类似表格的内容，请使用标准Markdown表格语法输出，例如：
    | DESCRIPTION | RATE | HOURS | AMOUNT |
    |------------|------|-------|---------|
    | Copy Writing | $50/hr | 4 | $200.00 |
+   | Website Design | $50/hr | 2 | $100.00 |
 
 2. 表格的表头和单元格之间需要有分隔行（使用|-）
 3. 确保表格列对齐，每列至少要有3个-
-4. 如果有表格，也不用忽视表格外的文字
+4. 金额要包含货币符号和小数点
+5. 如果有表格，也不用忽视表格外的文字
 
 参考以下例子格式：
 
@@ -145,11 +140,7 @@ const preprocessText = (text) => {
   // 移除可能存在的语言标识，如 ```markdown
   text = text.replace(/```\w+\n/g, '');
   
-  // 确保数学公式格式正确
-  text = text.replace(/\\\\\(/g, '$');
-  text = text.replace(/\\\\\)/g, '$');
-  text = text.replace(/\\\\\[/g, '$$');
-  text = text.replace(/\\\\\]/g, '$$');
+
   
   return text.trim();
 };
