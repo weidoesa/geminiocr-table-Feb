@@ -297,14 +297,14 @@ function App() {
 
           if (modelType === 'openai') {
             // OpenAI API调用
-            const response = await fetch('https://zangaaa-g2api.hf.space/hf/v1/chat/completions', {
+            const response = await fetch('https://gala.chataiapi.com/v1/chat/completions', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer 26e72514-58a7-47fd-b40d-12daef4aec32'
+                'Authorization': 'Bearer sk-8dbGvtwRm8Ge3EiuoXvsx1Ly38VmQvmrR5eTd0CXMOccQwid'
               },
               body: JSON.stringify({
-                model: "gemini-1.5-flash-latest",
+                model: "gemini-2.0-flash-exp",
                 messages: [
                   {
                     role: "user",
@@ -941,18 +941,7 @@ function App() {
       <main className={images.length > 0 ? 'has-content' : ''}>
         <div className={`upload-section ${images.length > 0 ? 'with-image' : ''}`}>
           <div className="model-switch">
-            <button
-                className={`model-button ${modelType === 'openai' ? 'active' : ''}`}
-                onClick={() => setModelType('openai')}
-            >
-              OpenAI
-            </button>
-            <button
-                className={`model-button ${modelType === 'gemini' ? 'active' : ''}`}
-                onClick={() => setModelType('gemini')}
-            >
-              Gemini
-            </button>
+
 
           </div>
 
