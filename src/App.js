@@ -1,43 +1,36 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Viewer } from '@bytemd/react';
+import mathPlugin from '@bytemd/plugin-math';
+import gfmPlugin from '@bytemd/plugin-gfm';
+import highlightPlugin from '@bytemd/plugin-highlight';
+import breaksPlugin from '@bytemd/plugin-breaks';
+import frontmatterPlugin from '@bytemd/plugin-frontmatter';
+import 'bytemd/dist/index.css';
 import 'katex/dist/katex.min.css';
+import 'highlight.js/styles/github.css';
 import './App.css';
 import { Document, Page, pdfjs } from 'react-pdf';
 import mammoth from 'mammoth';
-import MarkdownIt from 'markdown-it';
-import mk from 'markdown-it-katex';
-import taskLists from 'markdown-it-task-lists';
-import sub from 'markdown-it-sub';
-import sup from 'markdown-it-sup';
-import container from 'markdown-it-container';
-import { full as emoji } from 'markdown-it-emoji';
-import footnote from 'markdown-it-footnote';
-import deflist from 'markdown-it-deflist';
-import abbr from 'markdown-it-abbr';
-import mark from 'markdown-it-mark';
-import ins from 'markdown-it-ins';
 
-// 初始化 markdown-it 实例
-const md = new MarkdownIt({
-  html: true,
-  linkify: true,
-  typographer: true,
-  breaks: true,
-})
-.use(mk) // KaTeX 支持
-.use(taskLists) // 任务列表支持
-.use(sub) // 下标支持
-.use(sup) // 上标支持
-.use(container) // 容器支持
-.use(emoji) // emoji 支持
-.use(footnote) // 脚注支持
-.use(deflist) // 定义列表支持
-.use(abbr) // 缩写支持
-.use(mark) // 标记支持
-.use(ins); // 插入支持
-
-// 设置 PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// 配置 ByteMD 插件
+const plugins = [
+  mathPlugin({
+    katexOptions: {
+      throwOnError: false,
+      output: 'html',
+      strict: false,
+      trust: true,
+      macros: {
+        '\\f': '#1f(#2)',
+      },
+    }
+  }),
+  gfmPlugin(),
+  highlightPlugin(),
+  breaksPlugin(),
+  frontmatterPlugin()
+];
 
 // 初始化 Gemini API
 const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY);
@@ -86,58 +79,84 @@ const COMPLEX_EXAMPLE = {
 };
 
 const OCR_PROMPT = `
-限制：输出的最终内容必须可被正确解析，且不得包含多余的反引号。请严格按照以下规则识别并输出图片中的文字内容。
+请识别图片中的文字内容，注意以下要求：
 
 1. 数学公式规范：
-   - 独立成行的公式使用 $$...$$ 包裹
-   - 行内使用的变量与表达式使用 $...$ 包裹
-   - 保持原文中使用的变量名称不变
+   - 独立的数学公式使用 $$...$$，前后需要换行
+   - 行内数学公式使用 $...$，与文字之间需要空格
+   - 保持原文中的变量名称不变
 
-2. 示例：
-   - 原文：当 n 为偶数时
-   - 正确输出：当 $n$ 为偶数时
-   - 错误输出：当 Tn 为偶数时 或 当 @n@ 为偶数时
+2. 格式要求：
+   - 每个独立公式单独成行
+   - 公式与公式之间要有换行分隔
+   - 公式与文字之间要有空格分隔
+   - 保持原文的段落结构
 
-3. 文字识别要求：
-   - 如遇书写模糊或不清晰的词语，根据上下文进行合理推断和修正
-   - 确保句子通顺并保持原意
-   - 专业术语和专有名词需准确识别
+3. 示例格式：
+   这是一个行内公式 $x^2$ 的例子
 
-4. 输出格式：
-   - 仅输出识别后的文本内容，不得添加额外说明
+   这是一个独立公式：
+   $$
+   f(x) = x^2 + 1
+   $$
 
-特别注意：
-1. 如果图片中存在类似“表格”的内容，请使用标准 Markdown 表格语法输出。例如：
-   | DESCRIPTION    | RATE    | HOURS | AMOUNT   |
-   |---------------|---------|-------|----------|
-   | Copy Writing  | $50/hr  | 4     | $200.00  |
-   | Website Design| $50/hr  | 2     | $100.00  |
+   这是下一段文字...
 
-2. 表头与单元格之间需使用“|-”分隔行，并保证每列至少有三个“-”进行对齐
-3. 金额部分需包含货币符号以及小数点
-4. 若识别到表格，也不能忽略表格外的文字
-5. 以上要求须综合运用，完整输出图片中全部文本信息
+4. 特别注意：
+   - 不要省略任何公式或文字
+   - 保持原文的排版结构
+   - 确保公式之间有正确的分隔
+   - 序号和公式之间要有空格
+
+请按照以上规范输出识别结果。
 `;
 
-
-// 添加文本预处理函数
+// 修改预处理函数
 const preprocessText = (text) => {
   if (!text) return '';
   
   // 移除所有的 ``` 标记
   text = text.replace(/```[\s\S]*?```/g, (match) => {
-    // 提取 ``` 之间的内容
     const content = match.slice(3, -3).trim();
     return content;
   });
   
-  // 移除单独的 ``` 标记
-  text = text.replace(/```/g, '');
+  // 移除单独的 ``` 标记和语言标识
+  text = text.replace(/```\w*\n?/g, '');
   
-  // 移除可能存在的语言标识，如 ```markdown
-  text = text.replace(/```\w+\n/g, '');
+  // 标准化数学公式分隔符
+  text = text.replace(/\\\\\(/g, '$');
+  text = text.replace(/\\\\\)/g, '$');
+  text = text.replace(/\\\\\[/g, '$$');
+  text = text.replace(/\\\\\]/g, '$$');
   
-
+  // 确保公式之间有正确的分隔
+  text = text.replace(/\$\s*\$/g, '$ $'); // 修复连续的 $ 符号
+  text = text.replace(/\$\$\s*\$\$/g, '$$ $$'); // 修复连续的 $$ 符号
+  
+  // 确保公式和文本之间有空格
+  text = text.replace(/([^\s$])\$/g, '$1 $'); // 公式前加空格
+  text = text.replace(/\$([^\s$])/g, '$ $1'); // 公式后加空格
+  
+  // 处理数字序号和公式之间的空格
+  text = text.replace(/(\d+)\s*\$/g, '$1 $');
+  text = text.replace(/\$\s*(\d+)/g, '$ $1');
+  
+  // 确保每个公式独立成行
+  text = text.replace(/\$\$(.*?)\$\$/g, (match, formula) => {
+    return `\n$$${formula.trim()}$$\n`;
+  });
+  
+  // 处理行内公式
+  text = text.replace(/\$([^$]+?)\$/g, (match, formula) => {
+    return `$${formula.trim()}$`;
+  });
+  
+  // 处理多余的空行
+  text = text.replace(/\n\s*\n\s*\n/g, '\n\n');
+  
+  // 确保公式和文字之间有适当的换行
+  text = text.split('\n').map(line => line.trim()).filter(Boolean).join('\n\n');
   
   return text.trim();
 };
@@ -199,6 +218,45 @@ const processFormula = (formula) => {
     console.error('处理公式错误:', error);
     return formula;
   }
+};
+
+// 添加 Markdown 组件配置
+const MarkdownComponents = {
+  // 自定义表格渲染
+  table: ({ node, ...props }) => (
+    <table className="markdown-table" {...props} />
+  ),
+  // 自定义表格头部渲染
+  th: ({ node, ...props }) => (
+    <th className="markdown-th" {...props} />
+  ),
+  // 自定义表格单元格渲染
+  td: ({ node, ...props }) => (
+    <td className="markdown-td" {...props} />
+  ),
+  // 自定义代码块渲染
+  code: ({ node, inline, className, children, ...props }) => {
+    const match = /language-(\w+)/.exec(className || '');
+    return !inline && match ? (
+      <pre className={`language-${match[1]}`}>
+        <code className={`language-${match[1]}`} {...props}>
+          {children}
+        </code>
+      </pre>
+    ) : (
+      <code className={className} {...props}>
+        {children}
+      </code>
+    );
+  },
+  // 自定义图片渲染
+  img: ({ node, ...props }) => (
+    <img className="markdown-img" {...props} alt={props.alt || ''} />
+  ),
+  // 自定义链接渲染
+  a: ({ node, ...props }) => (
+    <a className="markdown-link" target="_blank" rel="noopener noreferrer" {...props} />
+  )
 };
 
 function App() {
@@ -1122,12 +1180,12 @@ function App() {
                       </button>
                     </div>
                   </div>
-                  <div 
-                    className="markdown-body"
-                    dangerouslySetInnerHTML={{ 
-                      __html: md.render(results[currentIndex] || '') 
-                    }}
-                  />
+                  <div className="markdown-body">
+                    <Viewer 
+                      value={results[currentIndex] || ''} 
+                      plugins={plugins}
+                    />
+                  </div>
                 </div>
               )}
             </div>
