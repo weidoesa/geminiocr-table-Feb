@@ -85,43 +85,40 @@ const COMPLEX_EXAMPLE = {
   PART3: '\\\\lim\\\\imits_{x \\\\to +\\\\infty} \\\\frac{\\\\arctan 2x + [b-1-bf(x)]\\\\arctan x}{\\\\frac{\\\\pi}{2} - \\\\arctan x}'
 };
 
-const OCR_PROMPT = `请你识别图片中的文字内容并输出，如果有格式不规整可以根据内容排版，或者单词错误中文词汇错误可以纠正，不要有任何开场白、解释、描述、总结或结束语。OCR识别图片上的内容，给出katex格式的内容。
-限制：返回之后的数据一定是要可以正确解析的，不要带有反引号;
-不要有<document>标签
-选择题的序号使用A. B.依次类推。
+const OCR_PROMPT = `
+限制：输出的最终内容必须可被正确解析，且不得包含多余的反引号。请严格按照以下规则识别并输出图片中的文字内容。
 
-支持的主要语法：
-1. 基本语法：
-   - 使用  $$ 包裹行内或块级数学公式
-   - 支持大量数学符号、希腊字母、运算符等
-   - 分数：${LATEX_EXAMPLES.FRACTION}
-   - 根号：${LATEX_EXAMPLES.SQRT}
-   - 上下标：${LATEX_EXAMPLES.SUPERSCRIPT}, ${LATEX_EXAMPLES.SUBSCRIPT}
-2. 极限使用：${LATEX_EXAMPLES.LIMIT}
+1. 数学公式规范：
+   - 独立成行的公式使用 $$...$$ 包裹
+   - 行内使用的变量与表达式使用 $...$ 包裹
+   - 保持原文中使用的变量名称不变
+
+2. 示例：
+   - 原文：当 n 为偶数时
+   - 正确输出：当 $n$ 为偶数时
+   - 错误输出：当 Tn 为偶数时 或 当 @n@ 为偶数时
+
+3. 文字识别要求：
+   - 如遇书写模糊或不清晰的词语，根据上下文进行合理推断和修正
+   - 确保句子通顺并保持原意
+   - 专业术语和专有名词需准确识别
+
+4. 输出格式：
+   - 仅输出识别后的文本内容，不得添加额外说明
+
 特别注意：
-1. 如果识别到类似表格的内容，请使用标准Markdown表格语法输出，例如：
-   | DESCRIPTION | RATE | HOURS | AMOUNT |
-   |------------|------|-------|---------|
-   | Copy Writing | $50/hr | 4 | $200.00 |
-   | Website Design | $50/hr | 2 | $100.00 |
+1. 如果图片中存在类似“表格”的内容，请使用标准 Markdown 表格语法输出。例如：
+   | DESCRIPTION    | RATE    | HOURS | AMOUNT   |
+   |---------------|---------|-------|----------|
+   | Copy Writing  | $50/hr  | 4     | $200.00  |
+   | Website Design| $50/hr  | 2     | $100.00  |
 
-2. 表格的表头和单元格之间需要有分隔行（使用|-）
-3. 确保表格列对齐，每列至少要有3个-
-4. 金额要包含货币符号和小数点
-5. 如果有表格，也不用忽视表格外的文字
+2. 表头与单元格之间需使用“|-”分隔行，并保证每列至少有三个“-”进行对齐
+3. 金额部分需包含货币符号以及小数点
+4. 若识别到表格，也不能忽略表格外的文字
+5. 以上要求须综合运用，完整输出图片中全部文本信息
+`;
 
-参考以下例子格式：
-
-### 35. ${CHOICE_EXAMPLE.QUESTION}
-A. $${CHOICE_EXAMPLE.OPTIONS[0]}$ 
-B. $${CHOICE_EXAMPLE.OPTIONS[1]}$ 
-C. $${CHOICE_EXAMPLE.OPTIONS[2]}$ 
-D. $${CHOICE_EXAMPLE.OPTIONS[3]}$
-
-36. (I) 求 $${COMPLEX_EXAMPLE.PART1}$;
-    (II) 若 $${COMPLEX_EXAMPLE.PART2}$ 不存在, 而 
-    $l = ${COMPLEX_EXAMPLE.PART3}$ 存在,
-试确定 $b$ 的值, 并求 (I)`;
 
 // 添加文本预处理函数
 const preprocessText = (text) => {
