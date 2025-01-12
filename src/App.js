@@ -59,7 +59,7 @@ const COMPLEX_EXAMPLE = {
   PART3: '\\\\lim\\\\imits_{x \\\\to +\\\\infty} \\\\frac{\\\\arctan 2x + [b-1-bf(x)]\\\\arctan x}{\\\\frac{\\\\pi}{2} - \\\\arctan x}'
 };
 
-const OCR_PROMPT = `请你识别图片中的文字内容并输出，如果有格式不规整可以根据内容排版，或者单词错误中文词汇错误可以纠正，不要有任何开场白、解释、描述、总结或结束语。OCR识别图片上的内容，如果是公式的话给出katex格式的内容不是的话单独拆开，不要把文字和katex放一起。
+const OCR_PROMPT = `请你识别图片中的文字内容并输出，如果有格式不规整可以根据内容排版，或者单词错误中文词汇错误可以纠正，不要有任何开场白、解释、描述、总结或结束语。OCR识别图片上的内容，给出katex格式的内容。
 限制：返回之后的数据一定是要可以正确解析的，不要带有反引号;
 不要有<document>标签
 选择题的序号使用A. B.依次类推。
@@ -172,6 +172,17 @@ function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const [modelType, setModelType] = useState('openai');
   const [isCorrectingText, setIsCorrectingText] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  // 添加检测移动设备的 useEffect
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // 修改粘贴事件处理函数
   useEffect(() => {
@@ -929,29 +940,25 @@ function App() {
           target="_blank" 
           rel="noopener noreferrer" 
           className="github-link"
+          style={{ display: isMobile ? 'none' : 'block' }}
         >
           <svg height="32" aria-hidden="true" viewBox="0 0 16 16" version="1.1" width="32">
             <path fillRule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
           </svg>
         </a>
         <h1>高精度OCR识别</h1>
-        <p>智能识别多国语言及手写体、表格、结构化抽取、数学公式，上传或拖拽图片、pdf即刻识别文字内容</p>
+        <p>{isMobile ? '上传图片、PDF即刻识别文字内容' : '智能识别多国语言及手写体、表格、结构化抽取、数学公式，上传或拖拽图片、pdf即刻识别文字内容'}</p>
       </header>
 
       <main className={images.length > 0 ? 'has-content' : ''}>
         <div className={`upload-section ${images.length > 0 ? 'with-image' : ''}`}>
-          <div className="model-switch">
-
-
-          </div>
-
           <div
-              ref={dropZoneRef}
-              className={`upload-zone ${isDragging ? 'dragging' : ''}`}
-              onDragEnter={handleDragEnter}
-              onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
+            ref={dropZoneRef}
+            className={`upload-zone ${isDragging ? 'dragging' : ''}`}
+            onDragEnter={!isMobile ? handleDragEnter : undefined}
+            onDragOver={!isMobile ? handleDragOver : undefined}
+            onDragLeave={!isMobile ? handleDragLeave : undefined}
+            onDrop={!isMobile ? handleDrop : undefined}
           >
             <div className="upload-container">
               <label className="upload-button" htmlFor="file-input">
@@ -968,15 +975,17 @@ function App() {
                 multiple
                 hidden
               />
-              <button 
-                className="url-button" 
-                onClick={() => setShowUrlInput(!showUrlInput)}
-              >
-                {showUrlInput ? '取消' : '使用链接'}
-              </button>
+              {!isMobile && (
+                <button 
+                  className="url-button" 
+                  onClick={() => setShowUrlInput(!showUrlInput)}
+                >
+                  {showUrlInput ? '取消' : '使用链接'}
+                </button>
+              )}
             </div>
             
-            {showUrlInput && (
+            {showUrlInput && !isMobile && (
               <form onSubmit={handleUrlSubmit} className="url-form">
                 <input
                   type="url"
@@ -991,7 +1000,7 @@ function App() {
               </form>
             )}
             
-            {!images.length > 0 && !showUrlInput && (
+            {!images.length > 0 && !showUrlInput && !isMobile && (
               <p className="upload-hint">或将图片拖放到此处</p>
             )}
           </div>
@@ -1054,13 +1063,10 @@ function App() {
                   <div className="gradient-text">
                     {(streamingStates[currentIndex] ? streamingTexts[currentIndex] : results[currentIndex])?.split(/(\$\$.*?\$\$|\$.*?\$)/gs).map((part, index) => {
                       if (part.startsWith('$$') && part.endsWith('$$')) {
-                        // 块级公式
                         return <BlockMath key={index} math={part.slice(2, -2)} />;
                       } else if (part.startsWith('$') && part.endsWith('$')) {
-                        // 行内公式
                         return <InlineMath key={index} math={part.slice(1, -1)} />;
                       } else {
-                        // 普通文本
                         return <ReactMarkdown key={index}>{part}</ReactMarkdown>;
                       }
                     })}
