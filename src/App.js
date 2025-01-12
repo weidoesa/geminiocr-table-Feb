@@ -59,14 +59,14 @@ const COMPLEX_EXAMPLE = {
   PART3: '\\\\lim\\\\imits_{x \\\\to +\\\\infty} \\\\frac{\\\\arctan 2x + [b-1-bf(x)]\\\\arctan x}{\\\\frac{\\\\pi}{2} - \\\\arctan x}'
 };
 
-const OCR_PROMPT = `请你识别图片中的文字内容并输出，如果有格式不规整可以根据内容排版，或者单词错误中文词汇错误可以纠正，不要有任何开场白、解释、描述、总结或结束语。OCR识别图片上的内容，给出markdown的katex的格式的内容。
-限制：返回之后的数据一定是要可以正确解析的
+const OCR_PROMPT = `请你识别图片中的文字内容并输出，如果有格式不规整可以根据内容排版，或者单词错误中文词汇错误可以纠正，不要有任何开场白、解释、描述、总结或结束语。OCR识别图片上的内容，给出katex格式的内容。
+限制：返回之后的数据一定是要可以正确解析的，不要带有反引号;
 不要有<document>标签
 选择题的序号使用A. B.依次类推。
 
 支持的主要语法：
 1. 基本语法：
-   - 使用 $ 或 $$ 包裹行内或块级数学公式
+   - 使用  $$ 包裹行内或块级数学公式
    - 支持大量数学符号、希腊字母、运算符等
    - 分数：${LATEX_EXAMPLES.FRACTION}
    - 根号：${LATEX_EXAMPLES.SQRT}
@@ -304,7 +304,7 @@ function App() {
                 'Authorization': 'Bearer 26e72514-58a7-47fd-b40d-12daef4aec32'
               },
               body: JSON.stringify({
-                model: "gpt-4o",
+                model: "gemini-1.5-flash-latest",
                 messages: [
                   {
                     role: "user",
@@ -322,7 +322,7 @@ function App() {
                     ]
                   }
                 ],
-                max_tokens: 4096,
+                max_tokens: 8000,
                 stream: true
               })
             });
@@ -851,14 +851,14 @@ function App() {
             'Authorization': 'Bearer 26e72514-58a7-47fd-b40d-12daef4aec32'
           },
           body: JSON.stringify({
-            model: "gpt-4o",
+            model: "gemini-1.5-flash-latest",
             messages: [
               {
                 role: "user",
                 content: prompt
               }
             ],
-            max_tokens: 4096,
+            max_tokens: 8000,
             stream: true
           })
         });
@@ -941,20 +941,26 @@ function App() {
       <main className={images.length > 0 ? 'has-content' : ''}>
         <div className={`upload-section ${images.length > 0 ? 'with-image' : ''}`}>
           <div className="model-switch">
-            <button 
-              className={`model-button ${modelType === 'openai' ? 'active' : ''}`}
-              onClick={() => setModelType('openai')}
+            <button
+                className={`model-button ${modelType === 'openai' ? 'active' : ''}`}
+                onClick={() => setModelType('openai')}
             >
               OpenAI
             </button>
-            
+            <button
+                className={`model-button ${modelType === 'gemini' ? 'active' : ''}`}
+                onClick={() => setModelType('gemini')}
+            >
+              Gemini
+            </button>
+
           </div>
-          
-          <div 
-            ref={dropZoneRef}
-            className={`upload-zone ${isDragging ? 'dragging' : ''}`}
-            onDragEnter={handleDragEnter}
-            onDragOver={handleDragOver}
+
+          <div
+              ref={dropZoneRef}
+              className={`upload-zone ${isDragging ? 'dragging' : ''}`}
+              onDragEnter={handleDragEnter}
+              onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
