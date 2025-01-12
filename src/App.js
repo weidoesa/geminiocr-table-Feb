@@ -286,7 +286,7 @@ function App() {
         setStreamingStates(prev => ({ ...prev, [index]: true }));
         setStreamingTexts(prev => ({ ...prev, [index]: '' }));
         
-        if (process.env.NODE_ENV === 'development') {
+         {
           const fileReader = new FileReader();
           const imageData = await new Promise((resolve) => {
             fileReader.onloadend = () => {
@@ -409,57 +409,8 @@ function App() {
               });
             }
           }
-        } else {
-          const fileReader = new FileReader();
-          const imageData = await new Promise((resolve) => {
-            fileReader.onloadend = () => {
-              resolve(fileReader.result.split(',')[1]);
-            };
-            fileReader.readAsDataURL(file);
-          });
-
-          const response = await fetch('/api/recognizeOpenAI', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              imageData,
-              mimeType: file.type
-            }),
-          });
-
-          const streamReader = response.body.getReader();
-
-          while (true) {
-            const { done, value } = await streamReader.read();
-            if (done) break;
-
-            const chunk = new TextDecoder().decode(value);
-            const lines = chunk.split('\n');
-            
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                try {
-                  const data = JSON.parse(line.slice(6));
-                  fullText += data.text;
-                  
-                  // 更新这一页的streaming文本
-                  setStreamingTexts(prev => ({ ...prev, [index]: fullText }));
-                  
-                  // 更新结果数组
-                  setResults(prevResults => {
-                    const newResults = [...prevResults];
-                    newResults[index] = fullText;
-                    return newResults;
-                  });
-                } catch (e) {
-                  console.error('Error parsing chunk:', e);
-                }
-              }
-            }
-          }
         }
+
 
         // 完成后更新状态
         setStreamingStates(prev => ({ ...prev, [index]: false }));
