@@ -22,8 +22,11 @@ https://ocr.howen.ink/
 
 本项目使用 Vercel 进行部署。在部署时需要设置以下环境变量：
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=[https://github.com/CiZaii/geminiocr](https://github.com/CiZaii/geminiocr)&env=REACT_APP_OPENAI_API_URL&envDescription=你的openbaseAPIUrl,一定要支持gemini-2.0-flash-exp模型&env=REACT_APP_OPENAI_API_KEY&envDescription=你的openbaseAPIKey&project-name=openaiocr&repository-name=openaiocr)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FCiZaii%2Fgeminiocr&env=REACT_APP_OPENAI_API_URL,REACT_APP_OPENAI_API_KEY&envDescription=API%20相关配置&envLink=https%3A%2F%2Fgithub.com%2FCiZaii%2Fgeminiocr%23%E9%83%A8%E7%BD%B2%E8%AF%B4%E6%98%8E&project-name=geminiocr&repository-name=geminiocr&demo-title=Gemini%20OCR&demo-description=基于%20Gemini%202.0%20的高精度%20OCR%20文字识别应用&demo-url=https%3A%2F%2Focr.howen.ink&demo-image=https%3A%2F%2Focr.howen.ink%2Fpreview.png)
 
+环境变量说明：
+- `REACT_APP_OPENAI_API_URL`: 你的 API 地址（需支持 gemini-2.0-flash-exp 模型）
+- `REACT_APP_OPENAI_API_KEY`: 你的 API 密钥
 
 **注意事项:**
 - **需要使用非香港、澳门、大陆地区的网络环境访问**
