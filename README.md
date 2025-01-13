@@ -22,11 +22,8 @@ https://ocr.howen.ink/
 
 本项目使用 Vercel 进行部署。在部署时需要设置以下环境变量：
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcokice%2Fgoogleocr-app&env=GEMINI_API_KEY&envDescription=Your%20Google%20Gemini%20API&project-name=geminiocr&repository-name=geminiocr)
-## Gemini API 密钥获取
-1. 访问 Google AI Studio (https://aistudio.google.com/)
-2. 点击左上角的 "Get API key" 按钮
-3. 按照提示完成 API key 的创建
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=[https://github.com/CiZaii/geminiocr](https://github.com/CiZaii/geminiocr)&env=REACT_APP_OPENAI_API_URL&envDescription=你的openbaseAPIUrl,一定要支持gemini-2.0-flash-exp模型&env=REACT_APP_OPENAI_API_KEY&envDescription=你的openbaseAPIKey&project-name=openaiocr&repository-name=openaiocr)
+
 
 **注意事项:**
 - **需要使用非香港、澳门、大陆地区的网络环境访问**
@@ -98,13 +95,6 @@ yarn start
 - 图片预览功能
 - 多图片导航切换
 
-
-## 注意事项
-
-- 请确保您的 Google Gemini API 密钥有足够的配额
-- 图片链接需要允许跨域访问
-- 建议上传清晰的图片以获得最佳识别效果
-- 数学公式应有清晰的结构
 
 ## 贡献
 

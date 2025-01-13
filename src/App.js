@@ -424,11 +424,11 @@ function App() {
 
           if (modelType === 'openai') {
             // OpenAI API调用
-            const response = await fetch('https://gala.chataiapi.com/v1/chat/completions', {
+            const response = await fetch(process.env.REACT_APP_OPENAI_API_URL, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer sk-8dbGvtwRm8Ge3EiuoXvsx1Ly38VmQvmrR5eTd0CXMOccQwid'
+                'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`
               },
               body: JSON.stringify({
                 model: "gemini-2.0-flash-exp",
@@ -1171,13 +1171,7 @@ function App() {
                   <div className="result-header">
                     <span>第 {currentIndex + 1} 张图片的识别结果</span>
                     <div className="result-actions">
-                      <button 
-                        className={`correct-button ${isCorrectingText ? 'correcting' : ''}`}
-                        onClick={handleCorrectText}
-                        disabled={isCorrectingText || !results[currentIndex]}
-                      >
-                        {isCorrectingText ? '纠错中...' : '公式纠错'}
-                      </button>
+
                       <button className="copy-button" onClick={handleCopyText}>
                         复制内容
                       </button>
