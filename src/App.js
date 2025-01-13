@@ -108,13 +108,22 @@ const OCR_PROMPT = `
    - 确保公式之间有正确的分隔
    - 序号和公式之间要有空格
 
+5. 如果图片中存在类似"表格"的内容，请使用标准 Markdown 表格语法输出。例如：
+   | DESCRIPTION    | RATE    | HOURS | AMOUNT   |
+   |---------------|---------|-------|----------|
+   | Copy Writing  | $50/hr  | 4     | $200.00  |
+   | Website Design| $50/hr  | 2     | $100.00  |   
+  5.1表头与单元格之间需使用"|-"分隔行，并保证每列至少有三个"-"进行对齐
+  5.2 金额部分需包含货币符号以及小数点
+  5.3 若识别到表格，也不能忽略表格外的文字
+  5.4 以上要求须综合运用，完整输出图片中全部文本信息
 请按照以上规范输出识别结果。
 `;
 
 // 修改预处理函数
 const preprocessText = (text) => {
   if (!text) return '';
-  
+
   // 移除所有的 ``` 标记
   text = text.replace(/```[\s\S]*?```/g, (match) => {
     const content = match.slice(3, -3).trim();
@@ -151,12 +160,6 @@ const preprocessText = (text) => {
   text = text.replace(/\$([^$]+?)\$/g, (match, formula) => {
     return `$${formula.trim()}$`;
   });
-  
-  // 处理多余的空行
-  text = text.replace(/\n\s*\n\s*\n/g, '\n\n');
-  
-  // 确保公式和文字之间有适当的换行
-  text = text.split('\n').map(line => line.trim()).filter(Boolean).join('\n\n');
   
   return text.trim();
 };
