@@ -492,8 +492,8 @@ function App() {
             // Gemini API调用
             const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY);
             const model = genAI.getGenerativeModel({
-            // model: "gemini-2.0-flash-exp",
-              model: "gemini-2.0-flash-thinking-exp-01-21",
+              model: "gemini-2.0-flash-exp",
+            //  model: "gemini-2.0-flash-thinking-exp-01-21",
               generationConfig,
             });
 
